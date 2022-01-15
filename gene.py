@@ -35,6 +35,17 @@ class Geneset:
     def __len__(self):
         return len(self.starts)
 
+    # defining this severely speeds up deep copying operations which are a major part of
+    # mutation and reproduction
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        result.starts, result.ends = self.starts.copy(), self.ends.copy()
+        result.weights = self.weights.copy()
+        result.idxdict = self.idxdict.copy()
+        result.owner = self.owner
+        return result
+
     def update_idxdict(self):
         tups = zip(self.starts, self.ends)
         self.idxdict = {tup: i for i, tup in enumerate(tups)}
@@ -125,9 +136,6 @@ class Geneset:
                 node.owner = newgene
         return newgene
 
-    def get_conn(self):
-        return (self.end, self.weight)
-
 def memoize(func):
     memo = None
 
@@ -143,7 +151,6 @@ def memoize(func):
 
 @memoize
 def get_viable_connections(nodeset=NODESET):
-    print("run")
     linputs, lhidden, loutputs = [len(i) for i in nodeset]
 
     # br for breakpoint

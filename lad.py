@@ -1,15 +1,12 @@
-import math
-from util import clip, randrange
-import random
+from util import clip
 
 
 class Lad:
-    def __init__(self, x, y, world, genes):
+    def __init__(self, world, genes):
         global worldsize
-        self.x = x
-        self.y = y
+        self.x = None
+        self.y = None
         self.world = world
-        self.world[x][y] = self
         self.geneset = genes
         self.geneset.owner = self
         self.nodes = genes.get_final_connections()
