@@ -1,5 +1,6 @@
 import itertools
 import random
+from copy import deepcopy
 from collections import OrderedDict, defaultdict
 from util import randrange, reverse_dictgraph, traverse_with
 from nodetypes import InputRandomNode, InputConstNode, InputOscillatorNode, HiddenNode,\
@@ -25,10 +26,14 @@ NODESET = [
 
 class Geneset:
     def __init__(self, connections):
-        self.starts, self.ends = zip(*connections)
+        self.starts, self.ends = (list(i) for i in zip(*connections))
         self.weights = [randrange(-1,1) for i in range(len(connections))]
         self.idxdict = dict()
         self.update_idxdict()
+        self.owner = None
+
+    def __len__(self):
+        return len(self.starts)
 
     def update_idxdict(self):
         tups = zip(self.starts, self.ends)
@@ -66,19 +71,59 @@ class Geneset:
         bad_connections = [(i, j) for i, j in chosen if (i not in good_nodes or j not in good_nodes)]
         return bad_connections
 
+    def get_final_connections(self):
+        chosen = zip(self.starts, self.ends)
+        # get all connections that don't connect to an input or output to prune
+        to_be_pruned = set(self.get_pruned_pairs())
+        # prune useless nodes
+        chosen = [tup for tup in chosen if tup not in to_be_pruned]
+        # get unique nodes
+        chosen_uniq = list(zip(*chosen))
+        chosen_uniq = set(chosen_uniq[0]) | set(chosen_uniq[1]) if chosen_uniq else set()
+
+        all_nodetypes = [node for nodetype in NODESET for node in nodetype]  # flattened list
+
+        # create objects, sorted so input nodes get forwarded first
+        actual_nodes = OrderedDict({idx:all_nodetypes[idx]() for idx in sorted(chosen_uniq)})
+        for startnode, endnode in chosen:
+            actual_nodes[startnode].connections.append(
+                (actual_nodes[endnode],
+                 self.get_conn_weight((startnode, endnode))))
+
+        return actual_nodes
+
     def mutate(self):
+        newgene = deepcopy(self)
+        newgene.owner = None
+
         choice = random.randint(0,2)
         conns = get_viable_connections()
+        conns = [conn for sublist in conns for conn in sublist]  # flattened list
+        mutgene = random.randint(0, len(newgene)-1)
 
         if choice == 0:
-            pass
             # mutate startpoint
+            possibilities = set([conn[0] for conn in conns if conn[1] == newgene.ends[mutgene]])
+            possibilities.remove(newgene.starts[mutgene])
+            chosen = random.sample(possibilities, 1)[0]
+            newgene.starts[mutgene] = chosen
         elif choice == 1:
-            pass
             # mutate endpoint
+            possibilities = set([conn[1] for conn in conns if conn[0] == newgene.starts[mutgene]])
+            possibilities.remove(newgene.ends[mutgene])
+            chosen = random.sample(possibilities, 1)[0]
+            newgene.ends[mutgene] = chosen
         elif choice == 2:
-            pass
             # mutate weight
+            newgene.weights[mutgene] = randrange(-1, 1)
+
+        # reset all nodes if mutation happened
+        if choice in [0, 1]:
+            newgene.update_idxdict()
+            newgene.nodes = newgene.get_final_connections()
+            for node in newgene.nodes.values():
+                node.owner = newgene
+        return newgene
 
     def get_conn(self):
         return (self.end, self.weight)
@@ -126,24 +171,4 @@ def gen_geneset(nodeset, numgenes):
     chosen = random.sample(all_conns, numgenes)
     # make geneset
     geneset = Geneset(chosen)
-    # get all connections that don't connect to an input or output to prune
-    to_be_pruned = set(geneset.get_pruned_pairs())
-    # prune useless nodes
-    chosen = [tup for tup in chosen if tup not in to_be_pruned]
-    # get unique nodes
-    chosen_uniq = list(zip(*chosen))
-    chosen_uniq = set(chosen_uniq[0]) | set(chosen_uniq[1]) if chosen_uniq else set()
-
-    all_nodetypes = [node for nodetype in nodeset for node in nodetype]  # flattened list
-
-    # create objects, sorted so input nodes get forwarded first
-    actual_nodes = OrderedDict({idx:all_nodetypes[idx]() for idx in sorted(chosen_uniq)})
-    for startnode, endnode in chosen:
-        actual_nodes[startnode].connections.append(
-            (actual_nodes[endnode],
-             geneset.get_conn_weight((startnode, endnode))))
-
-    # prune useless nodes for performance
-    # (any sub-networks that aren't connected to any input or output nodes)
-
-    return actual_nodes, geneset
+    return geneset

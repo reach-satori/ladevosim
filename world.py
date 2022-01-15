@@ -10,5 +10,8 @@ class World:
             raise ValueError("Out of map bounds")
         return self.map[x][y]
 
+    def reset(self):
+        self.map = [[None for i in range(self.size[1])] for j in range(self.size[0])]
+
     def __getitem__(self, val):
         return self.map[val]

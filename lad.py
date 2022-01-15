@@ -4,14 +4,17 @@ import random
 
 
 class Lad:
-    def __init__(self, x, y, world, genes, nodes):
+    def __init__(self, x, y, world, genes):
         global worldsize
         self.x = x
         self.y = y
         self.world = world
         self.world[x][y] = self
         self.geneset = genes
-        self.nodes = nodes
+        self.geneset.owner = self
+        self.nodes = genes.get_final_connections()
+        for node in self.nodes.values():
+            node.owner = self
 
     def act(self):
         pass
