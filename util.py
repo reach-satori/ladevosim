@@ -5,8 +5,7 @@ def clip(val, minv, maxv):
     return min(max(minv, val), maxv)
 
 def randrange(low, hi):
-    width = hi - low
-    return (random.random() * width) + low
+    return (random.random() * (hi - low)) + low
 
 def reverse_dictgraph(graph):
     out = defaultdict(set)

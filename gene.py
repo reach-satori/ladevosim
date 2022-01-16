@@ -1,16 +1,21 @@
 import itertools
 import random
 from copy import deepcopy
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from util import randrange, reverse_dictgraph, traverse_with
-from nodetypes import InputRandomNode, InputConstNode, InputOscillatorNode, HiddenNode,\
-    OutputHorizontalMovementNode, OutputVerticalMovementNode
+from nodetypes import InputRandomNode, InputConstNode, InputOscillatorNode, InputAgeNode,\
+    InputHorizontalLocationNode, InputVerticalLocationNode,\
+    HiddenNode,\
+    OutputHorizontalMovementNode, OutputVerticalMovementNode, OutputDummy
 
 NODESET = [
     [
         InputRandomNode,
         InputConstNode,
-        InputOscillatorNode
+        InputOscillatorNode,
+        InputAgeNode,
+        InputHorizontalLocationNode,
+        InputVerticalLocationNode
     ],
     [
         HiddenNode,
@@ -20,14 +25,20 @@ NODESET = [
     [
         OutputHorizontalMovementNode,
         OutputVerticalMovementNode,
+        OutputDummy
     ]
 ]
 
 
 class Geneset:
+    weightrange = (-4, 4)
+
     def __init__(self, connections):
+        # geneset represents connections as such:
+        # starts, ends and weights are lists of equal length. so at index 0, you know there's a connection
+        # between starts[0] and ends[0] with weight weights[0]
         self.starts, self.ends = (list(i) for i in zip(*connections))
-        self.weights = [randrange(-1,1) for i in range(len(connections))]
+        self.weights = [randrange(*self.weightrange) for i in range(len(connections))]
         self.idxdict = dict()
         self.update_idxdict()
         self.owner = None
@@ -95,7 +106,7 @@ class Geneset:
         all_nodetypes = [node for nodetype in NODESET for node in nodetype]  # flattened list
 
         # create objects, sorted so input nodes get forwarded first
-        actual_nodes = OrderedDict({idx:all_nodetypes[idx]() for idx in sorted(chosen_uniq)})
+        actual_nodes = dict({idx:all_nodetypes[idx]() for idx in sorted(chosen_uniq)})
         for startnode, endnode in chosen:
             actual_nodes[startnode].connections.append(
                 (actual_nodes[endnode],
@@ -107,7 +118,7 @@ class Geneset:
         newgene = deepcopy(self)
         newgene.owner = None
 
-        choice = random.randint(0,2)
+        choice = random.randint(0,3)
         conns = get_viable_connections()
         conns = [conn for sublist in conns for conn in sublist]  # flattened list
         mutgene = random.randint(0, len(newgene)-1)
@@ -126,10 +137,15 @@ class Geneset:
             newgene.ends[mutgene] = chosen
         elif choice == 2:
             # mutate weight
-            newgene.weights[mutgene] = randrange(-1, 1)
+            newgene.weights[mutgene] = randrange(*self.weightrange)
+        elif choice == 3:
+            # mutate entire connection
+            chosen = random.sample(conns, 1)[0]
+            newgene.starts[mutgene] = chosen[0]
+            newgene.ends[mutgene] = chosen[1]
 
         # reset all nodes if mutation happened
-        if choice in [0, 1]:
+        if choice in [0, 1, 3]:
             newgene.update_idxdict()
             newgene.nodes = newgene.get_final_connections()
             for node in newgene.nodes.values():
@@ -149,6 +165,7 @@ def memoize(func):
             return rv
     return wrapper
 
+# this is the equivalent of a c++ static function so we memoize the output
 @memoize
 def get_viable_connections(nodeset=NODESET):
     linputs, lhidden, loutputs = [len(i) for i in nodeset]
@@ -165,7 +182,9 @@ def get_viable_connections(nodeset=NODESET):
     # third: all combinations of hidden and outputs
     third = itertools.product(range(br_1, br_2), range(br_2, br_3))
 
-    return [list(i) for i in [first, second, third]]
+    out = [list(i) for i in [first, second, third]]
+    print("Number of viable connections:", sum(len(i) for i in out))
+    return out
 
 
 def gen_geneset(nodeset, numgenes):

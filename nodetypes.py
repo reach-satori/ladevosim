@@ -8,49 +8,44 @@ class Node:
         self.connections = []
         self.inputs = []
 
-    def add_input(self, val):
-        self.inputs.append(val)
-
     def fwd(self):
         raise NotImplementedError("Base class")
 
+class InputAgeNode(Node):
+    def fwd(self):
+        for node, w in self.connections:
+            node.inputs.append(w * self.owner.world.get_age())
+
 class InputRandomNode(Node):
     def fwd(self):
-        randval = randrange(-1,1)
         for node, w in self.connections:
-            node.add_input(w * randval)
+            node.inputs.append(w*randrange(-1,1))
 
 class InputConstNode(Node):
     def fwd(self):
         for node, w in self.connections:
-            node.add_input(w * 1.)
+            node.inputs.append(w)
 
 class InputHorizontalLocationNode(Node):
     def fwd(self):
         xval = self.owner.get_rel_x()
         for node, w in self.connections:
-            node.add_input(w * xval)
+            node.inputs.append(w * xval)
 
 class InputVerticalLocationNode(Node):
     def fwd(self):
         yval = self.owner.get_rel_y()
         for node, w in self.connections:
-            node.add_input(w * yval)
+            node.inputs.append(w * yval)
 
 class InputOscillatorNode(Node):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        start = -1 if not random.randint(0,1) else 1
-        self.curr = start
-
     def fwd(self):
         for node, w in self.connections:
-            node.add_input(w * self.curr)
-        self.curr *= -1
+            node.inputs.append(math.sin((math.pi * self.owner.world.simstep)/(10*w)))
 
 class OutputHorizontalMovementNode(Node):
     def fwd(self):
-        movechance = clip(sum(self.inputs), -1, 1)
+        movechance = math.tanh(sum(self.inputs))
         move = math.copysign((abs(movechance) > random.random()), movechance)
         if move:
             self.owner.move(int(move), 0)
@@ -58,15 +53,19 @@ class OutputHorizontalMovementNode(Node):
 
 class OutputVerticalMovementNode(Node):
     def fwd(self):
-        movechance = clip(sum(self.inputs), -1, 1)
+        movechance = math.tanh(sum(self.inputs))
         move = math.copysign((abs(movechance) > random.random()), movechance)
         if move:
             self.owner.move(0, int(move))
         self.inputs.clear()
 
+class OutputDummy(Node):
+    def fwd(self):
+        self.inputs.clear()
+
 class HiddenNode(Node):
     def fwd(self):
-        out = sum(self.inputs)
+        out = clip(sum(self.inputs), -10, 10)
         self.inputs.clear()
         for node, w in self.connections:
-            node.add_input(out * w)
+            node.inputs.append(out * w)
